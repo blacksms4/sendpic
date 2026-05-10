@@ -22,7 +22,7 @@
 
 <div class="container">
     <h2>📸 사진 전달 도구</h2>
-    <input type="file" id="photoInput" accept="image/*" capture="camera">
+    <input type="file" id="fileInput" accept="image/*" onchange="updateFileName()">
     <button onclick="uploadPhoto()">업로드하기</button>
     
     <div id="fileList">사진 목록을 불러오는 중...</div>
