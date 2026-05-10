@@ -7,57 +7,114 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        :root { --primary: #007bff; --success: #28a745; --black: #333; }
-        body { font-family: sans-serif; background: #f4f7f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .card { background: white; width: 100%; max-width: 450px; padding: 25px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); text-align: center; margin-bottom: 20px; }
-        .file-label { display: block; padding: 30px; background: #f8f9fa; border: 2px dashed #ddd; border-radius: 15px; cursor: pointer; margin-bottom: 15px; font-weight: bold; }
+        :root { 
+            --primary: #007bff; 
+            --success: #28a745; 
+            --danger: #dc3545; 
+            --dark: #333; 
+            --bg: #f4f7f9;
+        }
+        body { 
+            font-family: 'Pretendard', sans-serif; 
+            background: var(--bg); 
+            margin: 0; padding: 20px; 
+            display: flex; flex-direction: column; align-items: center; 
+        }
+        .card { 
+            background: white; width: 100%; max-width: 450px; 
+            padding: 25px; border-radius: 20px; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08); 
+            text-align: center; margin-bottom: 20px; 
+        }
+        .file-label { 
+            display: block; padding: 30px; background: #f8f9fa; 
+            border: 2px dashed #ddd; border-radius: 15px; 
+            cursor: pointer; margin-bottom: 15px; font-weight: bold; 
+        }
         #fileInput { display: none; }
-        button { border: none; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; width: 100%; font-size: 1rem; }
+        
+        button { 
+            border: none; padding: 15px; border-radius: 12px; 
+            font-weight: bold; cursor: pointer; transition: 0.2s; 
+            width: 100%; font-size: 1rem; 
+        }
         .btn-send { background: var(--primary); color: white; margin-bottom: 10px; }
-        .btn-zip { background: var(--black); color: white; margin-top: 10px; }
+        .btn-send:disabled { background: #ccc; }
         
-        /* 사진 리스트 디자인 */
-        #listContainer { width: 100%; max-width: 600px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-top: 20px; }
-        .photo-card { position: relative; background: white; padding: 8px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .photo-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; }
-        .btn-each-down { background: #eee; color: #333; padding: 5px; font-size: 0.8rem; border-radius: 6px; width: 100%; }
+        .button-group { 
+            width: 100%; max-width: 600px; 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; 
+        }
+        .btn-zip { background: var(--dark); color: white; }
+        .btn-delete-all { background: var(--danger); color: white; }
         
-        .auto-save-box { margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 10px; font-size: 0.9rem; border: 1px solid #ffeeba; }
+        #listContainer { 
+            width: 100%; max-width: 600px; 
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); 
+            gap: 15px; margin-top: 20px; 
+        }
+        .photo-card { 
+            position: relative; background: white; padding: 8px; 
+            border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+        }
+        .photo-card img { 
+            width: 100%; height: 120px; object-fit: cover; 
+            border-radius: 8px; margin-bottom: 8px; 
+        }
+        .btn-each-down { background: #eee; color: #333; padding: 6px; font-size: 0.8rem; border-radius: 6px; }
+        .btn-del-each { 
+            position: absolute; top: -5px; right: -5px; 
+            background: var(--danger); color: white; 
+            border: 2px solid white; border-radius: 50%; 
+            width: 26px; height: 26px; cursor: pointer; 
+            font-size: 12px; display: flex; align-items: center; justify-content: center;
+        }
+
+        .auto-save-box { 
+            margin-top: 15px; padding: 12px; 
+            background: #fff3cd; border-radius: 10px; 
+            font-size: 0.9rem; border: 1px solid #ffeeba; 
+        }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>📸 사진 전송기</h2>
+        <h2>📸 광명동굴 초고속 전송기</h2>
         <label for="fileInput" class="file-label" id="fileNameDisplay">사진 선택 (클릭)</label>
         <input type="file" id="fileInput" accept="image/*" onchange="updateFileName()" multiple>
         <button class="btn-send" onclick="sendPhoto()" id="sendBtn">서버로 보내기</button>
         
         <div class="auto-save-box">
             <input type="checkbox" id="autoDownload"> <b>PC 자동 저장 모드 ON</b>
-            <p style="margin: 5px 0 0 0; font-size: 0.75rem; color: #856404;">* 켜두면 새 사진이 올라올 때마다 자동 다운로드</p>
+            <div style="font-size: 0.75rem; color: #856404; margin-top: 4px;">
+                * 브라우저 설정에서 '팝업 허용'이 필요합니다.
+            </div>
         </div>
     </div>
 
-    <div style="width: 100%; max-width: 600px;">
-        <button class="btn-zip" id="zipBtn" onclick="downloadAllAsZip()">📦 모든 사진 ZIP 저장</button>
+    <div class="button-group">
+        <button class="btn-zip" id="zipBtn" onclick="downloadAllAsZip()">📦 전체 ZIP 저장</button>
+        <button class="btn-delete-all" onclick="deleteAllPhotos()">🗑️ 서버 비우기</button>
     </div>
 
     <div id="listContainer"></div>
 
     <script>
+        // Supabase 설정
         const SUPABASE_URL = 'https://mxwsqyzuzkjwjvsuqyvq.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF'; 
         const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        let downloadedSet = new Set(); // 이미 다운로드한 파일명 저장
+        let downloadedSet = new Set(); // 중복 자동 다운로드 방지용 기록
 
+        // 파일 선택 시 이름 표시 갱신
         function updateFileName() {
             const cnt = document.getElementById('fileInput').files.length;
             document.getElementById('fileNameDisplay').innerText = cnt + "장의 사진 선택됨";
         }
 
-        // 개별 다운로드 함수
+        // 개별 다운로드 실행 함수
         function downloadSingle(url, name) {
             const a = document.createElement('a');
             a.href = url;
@@ -67,58 +124,101 @@
             document.body.removeChild(a);
         }
 
+        // 서버로 사진 전송
         async function sendPhoto() {
             const files = document.getElementById('fileInput').files;
             if (!files.length) return alert('사진을 선택하세요!');
+            
             const btn = document.getElementById('sendBtn');
             btn.disabled = true;
 
             for (let i = 0; i < files.length; i++) {
                 const fileName = `cave_${Date.now()}_${i}.jpg`;
                 btn.innerText = `전송 중 (${i+1}/${files.length})`;
-                await _client.storage.from('phtos').upload(fileName, files[i]);
+                try {
+                    await _client.storage.from('phtos').upload(fileName, files[i]);
+                } catch (e) {
+                    console.error("전송 에러:", e);
+                }
             }
+            
             alert('전송 완료!');
             btn.disabled = false;
             btn.innerText = "서버로 보내기";
+            document.getElementById('fileInput').value = ""; // 입력창 초기화
+            updateFileName();
             getPhotos(); 
         }
 
+        // 서버에서 사진 리스트 가져오기 및 UI 렌더링
         async function getPhotos() {
-            const { data } = await _client.storage.from('phtos').list('', { limit: 30, sortBy: { column: 'created_at', order: 'desc' } });
-            if (!data) return;
+            const { data, error } = await _client.storage.from('phtos').list('', { 
+                limit: 50, 
+                sortBy: { column: 'created_at', order: 'desc' } 
+            });
+            
+            if (error || !data) return;
 
             const container = document.getElementById('listContainer');
             const isAuto = document.getElementById('autoDownload').checked;
             
-            // 리스트를 새로 그리기 전에 현재 화면에 있는 것과 비교
             let html = '';
             data.forEach(item => {
                 const { data: { publicUrl } } = _client.storage.from('phtos').getPublicUrl(item.name);
                 
-                // 1. 개별 카드 생성 (이미지 + 개별 다운로드 버튼)
+                // 카드 UI 생성 (이미지 + 개별삭제 + 개별저장)
                 html += `
                     <div class="photo-card">
                         <img src="${publicUrl}">
+                        <button class="btn-del-each" onclick="deletePhoto('${item.name}')" title="삭제">✕</button>
                         <button class="btn-each-down" onclick="downloadSingle('${publicUrl}', '${item.name}')">저장</button>
                     </div>`;
 
-                // 2. 자동 저장 로직 (체크되어 있고 + 처음 보는 파일일 때만)
+                // 자동 저장 로직
                 if (isAuto && !downloadedSet.has(item.name)) {
                     downloadSingle(publicUrl, item.name);
-                    downloadedSet.add(item.name); // 다운로드 목록에 추가
+                    downloadedSet.add(item.name);
                 }
             });
             container.innerHTML = html;
         }
 
+        // 사진 개별 삭제
+        async function deletePhoto(fileName) {
+            if (!confirm("이 사진을 삭제하시겠습니까?")) return;
+            const { error } = await _client.storage.from('phtos').remove([fileName]);
+            if (error) alert("삭제 실패: " + error.message);
+            else getPhotos();
+        }
+
+        // 사진 전체 삭제 (서버 비우기)
+        async function deleteAllPhotos() {
+            const { data } = await _client.storage.from('phtos').list();
+            if (!data || data.length === 0) return alert("삭제할 사진이 없습니다.");
+
+            if (!confirm(`주의! 서버에 있는 모든 사진(${data.length}장)을 완전히 삭제합니다.`)) return;
+
+            const filesToRemove = data.map(item => item.name);
+            const { error } = await _client.storage.from('phtos').remove(filesToRemove);
+
+            if (error) alert("오류 발생: " + error.message);
+            else {
+                alert("서버가 깨끗하게 비워졌습니다.");
+                downloadedSet.clear();
+                getPhotos();
+            }
+        }
+
+        // 전체 사진 ZIP 압축 다운로드
         async function downloadAllAsZip() {
             const zip = new JSZip();
             const { data } = await _client.storage.from('phtos').list();
-            if(!data || data.length === 0) return alert("사진이 없습니다.");
+            if(!data || data.length === 0) return alert("저장할 사진이 없습니다.");
 
             const btn = document.getElementById('zipBtn');
-            btn.innerText = "압축 중...";
+            const originalText = btn.innerText;
+            btn.innerText = "압축 생성 중...";
+            btn.disabled = true;
 
             for (const item of data) {
                 const { data: blob } = await _client.storage.from('phtos').download(item.name);
@@ -128,12 +228,14 @@
             const content = await zip.generateAsync({type:"blob"});
             const a = document.createElement('a');
             a.href = URL.createObjectURL(content);
-            a.download = `광명동굴_전체사진_${Date.now()}.zip`;
+            a.download = `광명동굴_백업_${Date.now()}.zip`;
             a.click();
-            btn.innerText = "📦 모든 사진 한꺼번에 저장 (ZIP)";
+            
+            btn.innerText = originalText;
+            btn.disabled = false;
         }
 
-        // 초기 실행 및 5초 간격 갱신
+        // 실행: 5초마다 자동 갱신
         getPhotos();
         setInterval(getPhotos, 5000);
     </script>
