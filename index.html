@@ -7,34 +7,40 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; }
+        :root { --primary: #007bff; --success: #28a745; --black: #333; }
         body { font-family: sans-serif; background: #f4f7f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .card { background: white; width: 100%; max-width: 450px; padding: 25px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); text-align: center; margin-bottom: 20px; }
         .file-label { display: block; padding: 30px; background: #f8f9fa; border: 2px dashed #ddd; border-radius: 15px; cursor: pointer; margin-bottom: 15px; font-weight: bold; }
+        #fileInput { display: none; }
         button { border: none; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; width: 100%; font-size: 1rem; }
         .btn-send { background: var(--primary); color: white; margin-bottom: 10px; }
-        .btn-zip { background: #333; color: white; margin-top: 10px; }
-        #listContainer { width: 100%; max-width: 600px; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
-        .photo-card { position: relative; background: white; padding: 5px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .photo-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; }
-        .auto-save-box { margin-top: 10px; font-size: 0.9rem; color: #666; }
+        .btn-zip { background: var(--black); color: white; margin-top: 10px; }
+        
+        /* 사진 리스트 디자인 */
+        #listContainer { width: 100%; max-width: 600px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-top: 20px; }
+        .photo-card { position: relative; background: white; padding: 8px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .photo-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; }
+        .btn-each-down { background: #eee; color: #333; padding: 5px; font-size: 0.8rem; border-radius: 6px; width: 100%; }
+        
+        .auto-save-box { margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 10px; font-size: 0.9rem; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>📸 사진 전송 & 일괄 저장</h2>
+        <h2>📸 사진 전송기</h2>
         <label for="fileInput" class="file-label" id="fileNameDisplay">사진 선택 (클릭)</label>
         <input type="file" id="fileInput" accept="image/*" onchange="updateFileName()" multiple>
         <button class="btn-send" onclick="sendPhoto()" id="sendBtn">서버로 보내기</button>
         
         <div class="auto-save-box">
-            <input type="checkbox" id="autoDownload"> PC 자동 다운로드 모드
+            <input type="checkbox" id="autoDownload"> <b>PC 자동 저장 모드 ON</b>
+            <p style="margin: 5px 0 0 0; font-size: 0.75rem; color: #856404;">* 켜두면 새 사진이 올라올 때마다 자동 다운로드</p>
         </div>
     </div>
 
     <div style="width: 100%; max-width: 600px;">
-        <button class="btn-zip" onclick="downloadAllAsZip()">📦 모든 사진 한꺼번에 저장 (ZIP)</button>
+        <button class="btn-zip" id="zipBtn" onclick="downloadAllAsZip()">📦 모든 사진 ZIP 저장</button>
     </div>
 
     <div id="listContainer"></div>
@@ -43,11 +49,22 @@
         const SUPABASE_URL = 'https://mxwsqyzuzkjwjvsuqyvq.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF'; 
         const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        let lastCount = 0;
+        
+        let downloadedSet = new Set(); // 이미 다운로드한 파일명 저장
 
         function updateFileName() {
             const cnt = document.getElementById('fileInput').files.length;
             document.getElementById('fileNameDisplay').innerText = cnt + "장의 사진 선택됨";
+        }
+
+        // 개별 다운로드 함수
+        function downloadSingle(url, name) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         async function sendPhoto() {
@@ -62,58 +79,63 @@
                 await _client.storage.from('phtos').upload(fileName, files[i]);
             }
             alert('전송 완료!');
-            location.reload();
+            btn.disabled = false;
+            btn.innerText = "서버로 보내기";
+            getPhotos(); 
         }
 
         async function getPhotos() {
-            const { data } = await _client.storage.from('phtos').list('', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
+            const { data } = await _client.storage.from('phtos').list('', { limit: 30, sortBy: { column: 'created_at', order: 'desc' } });
             if (!data) return;
 
             const container = document.getElementById('listContainer');
-            const tenMin = Date.now() - (10 * 60 * 1000);
-            container.innerHTML = '';
+            const isAuto = document.getElementById('autoDownload').checked;
             
+            // 리스트를 새로 그리기 전에 현재 화면에 있는 것과 비교
+            let html = '';
             data.forEach(item => {
-                if (new Date(item.created_at).getTime() > tenMin) {
-                    const { data: { publicUrl } } = _client.storage.from('phtos').getPublicUrl(item.name);
-                    container.innerHTML += `<div class="photo-card"><img src="${publicUrl}"></div>`;
-                    
-                    // PC 자동 다운로드 체크 시 실행
-                    if(document.getElementById('autoDownload').checked && data.length > lastCount) {
-                        const a = document.createElement('a');
-                        a.href = publicUrl;
-                        a.download = item.name;
-                        a.click();
-                    }
+                const { data: { publicUrl } } = _client.storage.from('phtos').getPublicUrl(item.name);
+                
+                // 1. 개별 카드 생성 (이미지 + 개별 다운로드 버튼)
+                html += `
+                    <div class="photo-card">
+                        <img src="${publicUrl}">
+                        <button class="btn-each-down" onclick="downloadSingle('${publicUrl}', '${item.name}')">저장</button>
+                    </div>`;
+
+                // 2. 자동 저장 로직 (체크되어 있고 + 처음 보는 파일일 때만)
+                if (isAuto && !downloadedSet.has(item.name)) {
+                    downloadSingle(publicUrl, item.name);
+                    downloadedSet.add(item.name); // 다운로드 목록에 추가
                 }
             });
-            lastCount = data.length;
+            container.innerHTML = html;
         }
 
-        // 일괄 ZIP 다운로드 기능
         async function downloadAllAsZip() {
             const zip = new JSZip();
             const { data } = await _client.storage.from('phtos').list();
-            if(!data || data.length === 0) return alert("저장할 사진이 없습니다.");
+            if(!data || data.length === 0) return alert("사진이 없습니다.");
 
-            const btn = document.querySelector('.btn-zip');
-            btn.innerText = "압축 중... 잠시만 기다리세요";
+            const btn = document.getElementById('zipBtn');
+            btn.innerText = "압축 중...";
 
             for (const item of data) {
                 const { data: blob } = await _client.storage.from('phtos').download(item.name);
-                zip.file(item.name, blob);
+                if(blob) zip.file(item.name, blob);
             }
 
             const content = await zip.generateAsync({type:"blob"});
             const a = document.createElement('a');
             a.href = URL.createObjectURL(content);
-            a.download = `광명동굴_사진_${Date.now()}.zip`;
+            a.download = `광명동굴_전체사진_${Date.now()}.zip`;
             a.click();
             btn.innerText = "📦 모든 사진 한꺼번에 저장 (ZIP)";
         }
 
+        // 초기 실행 및 5초 간격 갱신
         getPhotos();
-        setInterval(getPhotos, 5000); // 5초마다 자동 갱신
+        setInterval(getPhotos, 5000);
     </script>
 </body>
 </html>
