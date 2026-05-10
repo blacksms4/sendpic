@@ -1,58 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>광명동굴 사진전달</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; text-align: center; background-color: #f0f2f5; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { color: #1c1e21; margin-bottom: 20px; }
+        input[type="file"] { margin: 15px 0; width: 100%; }
+        button { width: 100%; padding: 12px; background: #3ecf8e; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        button:hover { background: #34b27b; }
+        #fileList { margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .img-item { background: #fff; border: 1px solid #ddd; padding: 5px; border-radius: 8px; }
+        img { width: 100%; height: 120px; object-fit: cover; border-radius: 5px; }
+        .download-link { display: block; margin-top: 5px; font-size: 13px; color: #007bff; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📸 사진 전달 도구</h2>
+    <input type="file" id="photoInput" accept="image/*" capture="camera">
+    <button onclick="uploadPhoto()">업로드하기</button>
+    
+    <div id="fileList">사진 목록을 불러오는 중...</div>
+</div>
+
 <script>
-    // 1. 주소와 키 (복사하신 주소와 키를 정확히 넣어주세요)
+    // 1. 설정 정보 (여기에 본인의 ANON_KEY만 넣으세요)
     const SUPABASE_URL = 'https://mxwsqyzuzkjwjvsuqyvq.supabase.co';
-    const SUPABASE_KEY = sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF'; // 본인의 ANON KEY
+    const SUPABASE_KEY = 'sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF'; // <-- 여기에 sb_publishable_... 입력
 
-    const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // 2. 클라이언트 초기화 (오타 방지를 위해 라이브러리 존재 확인)
+    let _client;
+    try {
+        _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    } catch (e) {
+        console.error("초기화 에러:", e);
+    }
 
+    // 3. 업로드 함수
     async function uploadPhoto() {
         const fileInput = document.getElementById('photoInput');
-        if (fileInput.files.length === 0) return alert('사진을 선택해주세요.');
+        if (!fileInput.files.length) return alert('사진을 먼저 선택하세요!');
 
         const file = fileInput.files[0];
-        // 400 에러 방지: 파일명을 영문/숫자로 강제 변환 (확장자 유지)
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`; 
+        const fileName = Date.now() + '.jpg'; // 파일명을 숫자로 단순화
 
         const { data, error } = await _client.storage
-            .from('photos') 
-            .upload(fileName, file, {
-                cacheControl: '3600',
-                upsert: false
-            });
+            .from('photos')
+            .upload(fileName, file);
 
         if (error) {
-            console.error('에러 상세:', error);
-            alert('업로드 실패: ' + error.message);
+            alert('에러 발생: ' + error.message);
         } else {
-            alert('업로드 성공!');
-            loadPhotos();
+            alert('업로드 완료!');
+            loadPhotos(); // 목록 새로고침
         }
     }
 
+    // 4. 목록 불러오기 함수
     async function loadPhotos() {
+        const listDiv = document.getElementById('fileList');
         const { data, error } = await _client.storage.from('photos').list('', {
-            limit: 20,
+            limit: 10,
             sortBy: { column: 'created_at', order: 'desc' }
         });
 
         if (error) {
-            document.getElementById('fileList').innerHTML = "목록 로딩 실패";
+            listDiv.innerHTML = "목록을 가져올 수 없습니다.";
             return;
         }
 
-        const listDiv = document.getElementById('fileList');
         listDiv.innerHTML = '';
-        
         data.forEach(file => {
             const { data: { publicUrl } } = _client.storage.from('photos').getPublicUrl(file.name);
             listDiv.innerHTML += `
                 <div class="img-item">
-                    <img src="${publicUrl}" onerror="this.src='https://via.placeholder.com/150?text=Error'">
-                    <a href="${publicUrl}" target="_blank" class="download-btn">내려받기</a>
+                    <img src="${publicUrl}">
+                    <a href="${publicUrl}" target="_blank" class="download-link">다운로드</a>
                 </div>`;
         });
     }
 
+    // 페이지 로드 시 목록 불러오기
     window.onload = loadPhotos;
 </script>
+
+</body>
+</html>
