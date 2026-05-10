@@ -2,10 +2,77 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Quick Share</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사진 전달 도구</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; text-align: center; }
+        .card { border: 1px solid #ccc; padding: 20px; border-radius: 10px; }
+        button { padding: 10px 20px; background: #3ecf8e; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        #fileList { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+        .img-item { width: 150px; border: 1px solid #eee; padding: 5px; }
+        img { width: 100%; height: auto; border-radius: 5px; }
+    </style>
 </head>
 <body>
-    <div id="root"></div>
-    <script type="module" src="./quickshare.jsx"></script>
+    <h2>📸 사진 전달 도구 (Supabase)</h2>
+    <div class="card">
+        <input type="file" id="photoInput" accept="image/*" capture="camera">
+        <button onclick="uploadPhoto()">업로드</button>
+    </div>
+
+    <div id="fileList">사진 목록을 불러오는 중...</div>
+
+    <script>
+        // 여기에 본인의 정보를 입력하세요!
+        const SUPABASE_URL = 'mxwsqyzuzkjwjvsuqyvq';
+        const SUPABASE_KEY = 'sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 1. 사진 업로드 함수
+        async function uploadPhoto() {
+            const fileInput = document.getElementById('photoInput');
+            if (fileInput.files.length === 0) return alert('사진을 선택해주세요.');
+
+            const file = fileInput.files[0];
+            const fileName = `${Date.now()}_${file.name}`; // 파일명 중복 방지
+
+            const { data, error } = await supabase.storage
+                .from('photos') // 아까 만드신 버킷 이름
+                .upload(fileName, file);
+
+            if (error) {
+                alert('업로드 실패: ' + error.message);
+            } else {
+                alert('업로드 성공!');
+                loadPhotos();
+            }
+        }
+
+        // 2. 사진 목록 불러오기 함수
+        async function loadPhotos() {
+            const { data, error } = await supabase.storage.from('photos').list('', {
+                limit: 10,
+                offset: 0,
+                sortBy: { column: 'created_at', order: 'desc' }
+            });
+
+            if (error) return console.error(error);
+
+            const listDiv = document.getElementById('fileList');
+            listDiv.innerHTML = '';
+            
+            data.forEach(file => {
+                const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(file.name);
+                listDiv.innerHTML += `
+                    <div class="img-item">
+                        <img src="${publicUrl}">
+                        <a href="${publicUrl}" target="_blank">다운로드</a>
+                    </div>`;
+            });
+        }
+
+        loadPhotos(); // 페이지 열릴 때 목록 불러오기
+    </script>
 </body>
 </html>
