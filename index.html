@@ -50,7 +50,7 @@
         const fileName = Date.now() + '.jpg'; // 파일명을 숫자로 단순화
 
         const { data, error } = await _client.storage
-            .from('photos')
+            .from('phtos')
             .upload(fileName, file);
 
         if (error) {
