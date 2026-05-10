@@ -3,42 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>사진 전달 도구</title>
+    <title>광명동굴 사진 전달</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; text-align: center; }
-        .card { border: 1px solid #ccc; padding: 20px; border-radius: 10px; }
-        button { padding: 10px 20px; background: #3ecf8e; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        #fileList { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-        .img-item { width: 150px; border: 1px solid #eee; padding: 5px; }
-        img { width: 100%; height: auto; border-radius: 5px; }
+        body { font-family: sans-serif; padding: 20px; text-align: center; background-color: #f4f7f6; }
+        .card { border: 1px solid #ddd; padding: 20px; border-radius: 10px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button { padding: 12px 24px; background: #3ecf8e; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #fileList { margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        .img-item { background: white; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
+        img { width: 100%; height: 100px; object-fit: cover; border-radius: 4px; }
+        .download-btn { display: block; margin-top: 5px; font-size: 12px; color: #007bff; text-decoration: none; }
     </style>
 </head>
 <body>
-    <h2>📸 사진 전달 도구 (Supabase)</h2>
+    <h3>📸 사진 전달 도구</h3>
     <div class="card">
-        <input type="file" id="photoInput" accept="image/*" capture="camera">
-        <button onclick="uploadPhoto()">업로드</button>
+        <input type="file" id="photoInput" accept="image/*" capture="camera" style="margin-bottom:10px;">
+        <br>
+        <button onclick="uploadPhoto()">서버로 업로드</button>
     </div>
 
     <div id="fileList">사진 목록을 불러오는 중...</div>
 
     <script>
-        // 여기에 본인의 정보를 입력하세요!
-        const SUPABASE_URL = 'mxwsqyzuzkjwjvsuqyvq';
-        const SUPABASE_KEY = 'sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // 변수명을 _client로 바꿔서 충돌을 방지합니다.
+        const SUPABASE_URL = '본인의_URL';
+        const SUPABASE_KEY = '본인의_ANON_KEY';
+        
+        // 초기화 코드 수정
+        const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // 1. 사진 업로드 함수
         async function uploadPhoto() {
             const fileInput = document.getElementById('photoInput');
             if (fileInput.files.length === 0) return alert('사진을 선택해주세요.');
 
             const file = fileInput.files[0];
-            const fileName = `${Date.now()}_${file.name}`; // 파일명 중복 방지
+            const fileName = `${Date.now()}_${file.name}`;
 
-            const { data, error } = await supabase.storage
-                .from('photos') // 아까 만드신 버킷 이름
+            const { data, error } = await _client.storage
+                .from('photos')
                 .upload(fileName, file);
 
             if (error) {
@@ -49,30 +52,32 @@
             }
         }
 
-        // 2. 사진 목록 불러오기 함수
         async function loadPhotos() {
-            const { data, error } = await supabase.storage.from('photos').list('', {
-                limit: 10,
-                offset: 0,
+            const { data, error } = await _client.storage.from('photos').list('', {
+                limit: 20,
                 sortBy: { column: 'created_at', order: 'desc' }
             });
 
-            if (error) return console.error(error);
+            if (error) {
+                document.getElementById('fileList').innerHTML = "목록을 불러오지 못했습니다.";
+                return;
+            }
 
             const listDiv = document.getElementById('fileList');
             listDiv.innerHTML = '';
             
             data.forEach(file => {
-                const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(file.name);
+                const { data: { publicUrl } } = _client.storage.from('photos').getPublicUrl(file.name);
                 listDiv.innerHTML += `
                     <div class="img-item">
                         <img src="${publicUrl}">
-                        <a href="${publicUrl}" target="_blank">다운로드</a>
+                        <a href="${publicUrl}" target="_blank" class="download-btn">내려받기</a>
                     </div>`;
             });
         }
 
-        loadPhotos(); // 페이지 열릴 때 목록 불러오기
+        // 페이지 로드 시 실행
+        window.onload = loadPhotos;
     </script>
 </body>
 </html>
