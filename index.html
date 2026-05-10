@@ -87,6 +87,22 @@
 
     // 페이지 로드 시 목록 불러오기
     window.onload = loadPhotos;
+
+    async function clearServer() {
+    if(!confirm("서버의 모든 사진을 삭제하시겠습니까?")) return;
+
+    const { data: list } = await _client.storage.from('phtos').list();
+    if (list.length === 0) return alert("삭제할 사진이 없습니다.");
+
+    const filesToRemove = list.map(x => x.name);
+    const { error } = await _client.storage.from('phtos').remove(filesToRemove);
+
+    if (error) alert("삭제 실패: " + error.message);
+    else {
+        alert("서버가 비워졌습니다.");
+        location.reload();
+    }
+}
 </script>
 
 </body>
