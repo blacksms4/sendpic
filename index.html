@@ -3,107 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>광명동굴 사진전달</title>
+    <title>광명동굴 사진 전송기</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; text-align: center; background-color: #f0f2f5; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h2 { color: #1c1e21; margin-bottom: 20px; }
-        input[type="file"] { margin: 15px 0; width: 100%; }
-        button { width: 100%; padding: 12px; background: #3ecf8e; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; }
-        button:hover { background: #34b27b; }
-        #fileList { margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .img-item { background: #fff; border: 1px solid #ddd; padding: 5px; border-radius: 8px; }
-        img { width: 100%; height: 120px; object-fit: cover; border-radius: 5px; }
-        .download-link { display: block; margin-top: 5px; font-size: 13px; color: #007bff; text-decoration: none; font-weight: bold; }
+        :root { --primary-color: #007bff; --success-color: #28a745; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f8f9fa; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .upload-card { background: white; width: 100%; max-width: 400px; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; margin-bottom: 20px; border: 1px solid #eee; }
+        h2 { margin-top: 0; font-size: 1.2rem; color: #333; }
+        input[type="file"] { display: none; }
+        .file-label { display: block; padding: 20px; background: #f1f3f5; border: 2px dashed #dee2e6; border-radius: 12px; cursor: pointer; margin-bottom: 15px; color: #495057; font-weight: 500; }
+        .btn-send { background: var(--primary-color); color: white; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+        .btn-send:disabled { background: #ccc; cursor: not-allowed; }
+        
+        #listContainer { width: 100%; max-width: 600px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 10px; }
+        .photo-card { background: white; padding: 6px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eee; }
+        .photo-card img { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; background: #eee; }
+        .btn-down { display: block; text-align: center; padding: 8px; margin-top: 6px; background: var(--success-color); color: white; text-decoration: none; border-radius: 6px; font-size: 0.85rem; font-weight: bold; }
+        .empty-msg { grid-column: 1 / -1; color: #999; padding: 40px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>📸 사진 전달 도구</h2>
-    <input type="file" id="fileInput" accept="image/*" onchange="updateFileName()">
-    <button onclick="uploadPhoto()">업로드하기</button>
-    
-    <div id="fileList">사진 목록을 불러오는 중...</div>
-</div>
+    <div class="upload-card">
+        <h2>📂 사진 전송 (10분 노출)</h2>
+        <label for="fileInput" class="file-label" id="fileNameDisplay">
+            📸 클릭하여 사진 선택<br><small>(여러 장 선택 가능)</small>
+        </label>
+        <input type="file" id="fileInput" accept="image/*" onchange="updateFileName()" multiple>
+        <button class="btn-send" onclick="sendPhoto()" id="sendBtn">서버로 전송하기</button>
+    </div>
 
-<script>
-    // 1. 설정 정보 (여기에 본인의 ANON_KEY만 넣으세요)
-    const SUPABASE_URL = 'https://mxwsqyzuzkjwjvsuqyvq.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF'; // <-- 여기에 sb_publishable_... 입력
+    <div id="listContainer">
+        <p class="empty-msg">사진 목록을 불러오는 중...</p>
+    </div>
 
-    // 2. 클라이언트 초기화 (오타 방지를 위해 라이브러리 존재 확인)
-    let _client;
-    try {
-        _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    } catch (e) {
-        console.error("초기화 에러:", e);
-    }
+    <script>
+        // 1. 설정 정보
+        const SUPABASE_URL = 'https://mxwsqyzuzkjwjvsuqyvq.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF'; 
+        const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 3. 업로드 함수
-    async function uploadPhoto() {
-        const fileInput = document.getElementById('photoInput');
-        if (!fileInput.files.length) return alert('사진을 먼저 선택하세요!');
-
-        const file = fileInput.files[0];
-        const fileName = Date.now() + '.jpg'; // 파일명을 숫자로 단순화
-
-        const { data, error } = await _client.storage
-            .from('phtos')
-            .upload(fileName, file);
-
-        if (error) {
-            alert('에러 발생: ' + error.message);
-        } else {
-            alert('업로드 완료!');
-            loadPhotos(); // 목록 새로고침
-        }
-    }
-
-    // 4. 목록 불러오기 함수
-    async function loadPhotos() {
-        const listDiv = document.getElementById('fileList');
-        const { data, error } = await _client.storage.from('photos').list('', {
-            limit: 10,
-            sortBy: { column: 'created_at', order: 'desc' }
-        });
-
-        if (error) {
-            listDiv.innerHTML = "목록을 가져올 수 없습니다.";
-            return;
+        // 파일 선택 시 화면 표시 업데이트
+        function updateFileName() {
+            const files = document.getElementById('fileInput').files;
+            const display = document.getElementById('fileNameDisplay');
+            if (files.length > 0) {
+                display.innerText = `✅ 사진 ${files.length}장 선택됨`;
+                display.style.borderColor = "#3ecf8e";
+                display.style.backgroundColor = "#f0fff4";
+            }
         }
 
-        listDiv.innerHTML = '';
-        data.forEach(file => {
-            const { data: { publicUrl } } = _client.storage.from('photos').getPublicUrl(file.name);
-            listDiv.innerHTML += `
-                <div class="img-item">
-                    <img src="${publicUrl}">
-                    <a href="${publicUrl}" target="_blank" class="download-link">다운로드</a>
-                </div>`;
-        });
-    }
+        // 여러 장 순차 업로드 함수
+        async function sendPhoto() {
+            const input = document.getElementById('fileInput');
+            const files = input.files;
+            if (!files.length) return alert('사진을 선택해주세요!');
+            
+            const btn = document.getElementById('sendBtn');
+            btn.disabled = true;
 
-    // 페이지 로드 시 목록 불러오기
-    window.onload = loadPhotos;
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileName = `cave_${Date.now()}_${i}.jpg`;
+                btn.innerText = `전송 중... (${i + 1}/${files.length})`;
 
-    async function clearServer() {
-    if(!confirm("서버의 모든 사진을 삭제하시겠습니까?")) return;
+                const { error } = await _client.storage.from('phtos').upload(fileName, file);
+                if (error) console.error("업로드 에러:", error.message);
+            }
 
-    const { data: list } = await _client.storage.from('phtos').list();
-    if (list.length === 0) return alert("삭제할 사진이 없습니다.");
+            alert(files.length + '장의 사진을 성공적으로 보냈습니다!');
+            location.reload(); 
+        }
 
-    const filesToRemove = list.map(x => x.name);
-    const { error } = await _client.storage.from('phtos').remove(filesToRemove);
+        // 목록 불러오기 (10분 이내 사진만)
+        async function getPhotos() {
+            const container = document.getElementById('listContainer');
+            const { data, error } = await _client.storage.from('phtos').list('', {
+                limit: 30, sortBy: { column: 'created_at', order: 'desc' }
+            });
 
-    if (error) alert("삭제 실패: " + error.message);
-    else {
-        alert("서버가 비워졌습니다.");
-        location.reload();
-    }
-}
-</script>
+            if (error || !data || data.length === 0) {
+                container.innerHTML = '<p class="empty-msg">최근 전송된 사진이 없습니다.</p>';
+                return;
+            }
 
+            container.innerHTML = '';
+            const tenMinutesAgo = Date.now() - (10 * 60 * 1000); 
+            let count = 0;
+
+            data.forEach(item => {
+                const createdTime = new Date(item.created_at).getTime();
+                
+                // 10분이 지나지 않은 사진만 표시
+                if (createdTime > tenMinutesAgo) {
+                    count++;
+                    const { data: { publicUrl } } = _client.storage.from('phtos').getPublicUrl(item.name);
+                    container.innerHTML += `
+                        <div class="photo-card">
+                            <img src="${publicUrl}">
+                            <a href="${publicUrl}" target="_blank" class="btn-down">📥 PC 저장</a>
+                        </div>`;
+                }
+            });
+
+            if (count === 0) {
+                container.innerHTML = '<p class="empty-msg">최근 10분 내 사진이 없습니다.</p>';
+            }
+        }
+
+        getPhotos();
+        // 1분마다 자동으로 목록 새로고침 (선택 사항)
+        setInterval(getPhotos, 60000);
+    </script>
 </body>
 </html>
