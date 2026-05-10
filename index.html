@@ -1,83 +1,58 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>광명동굴 사진 전달</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        body { font-family: sans-serif; padding: 20px; text-align: center; background-color: #f4f7f6; }
-        .card { border: 1px solid #ddd; padding: 20px; border-radius: 10px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        button { padding: 12px 24px; background: #3ecf8e; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        #fileList { margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-        .img-item { background: white; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
-        img { width: 100%; height: 100px; object-fit: cover; border-radius: 4px; }
-        .download-btn { display: block; margin-top: 5px; font-size: 12px; color: #007bff; text-decoration: none; }
-    </style>
-</head>
-<body>
-    <h3>📸 사진 전달 도구</h3>
-    <div class="card">
-        <input type="file" id="photoInput" accept="image/*" capture="camera" style="margin-bottom:10px;">
-        <br>
-        <button onclick="uploadPhoto()">서버로 업로드</button>
-    </div>
+<script>
+    // 1. 주소와 키 (복사하신 주소와 키를 정확히 넣어주세요)
+    const SUPABASE_URL = 'https://mxwsqyzuzkjwjvsuqyvq.supabase.co';
+    const SUPABASE_KEY = sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF'; // 본인의 ANON KEY
 
-    <div id="fileList">사진 목록을 불러오는 중...</div>
+    const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    <script>
-        // 변수명을 _client로 바꿔서 충돌을 방지합니다.
-        const SUPABASE_URL = 'https://mxwsqyzuzkjwjvsuqyvq.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_OlrVJLidj837H7u0eYxgdw_T8SdBMSF';
+    async function uploadPhoto() {
+        const fileInput = document.getElementById('photoInput');
+        if (fileInput.files.length === 0) return alert('사진을 선택해주세요.');
+
+        const file = fileInput.files[0];
+        // 400 에러 방지: 파일명을 영문/숫자로 강제 변환 (확장자 유지)
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`; 
+
+        const { data, error } = await _client.storage
+            .from('photos') 
+            .upload(fileName, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+
+        if (error) {
+            console.error('에러 상세:', error);
+            alert('업로드 실패: ' + error.message);
+        } else {
+            alert('업로드 성공!');
+            loadPhotos();
+        }
+    }
+
+    async function loadPhotos() {
+        const { data, error } = await _client.storage.from('photos').list('', {
+            limit: 20,
+            sortBy: { column: 'created_at', order: 'desc' }
+        });
+
+        if (error) {
+            document.getElementById('fileList').innerHTML = "목록 로딩 실패";
+            return;
+        }
+
+        const listDiv = document.getElementById('fileList');
+        listDiv.innerHTML = '';
         
-        // 초기화 코드 수정
-        const _client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        data.forEach(file => {
+            const { data: { publicUrl } } = _client.storage.from('photos').getPublicUrl(file.name);
+            listDiv.innerHTML += `
+                <div class="img-item">
+                    <img src="${publicUrl}" onerror="this.src='https://via.placeholder.com/150?text=Error'">
+                    <a href="${publicUrl}" target="_blank" class="download-btn">내려받기</a>
+                </div>`;
+        });
+    }
 
-        async function uploadPhoto() {
-            const fileInput = document.getElementById('photoInput');
-            if (fileInput.files.length === 0) return alert('사진을 선택해주세요.');
-
-            const file = fileInput.files[0];
-            const fileName = `${Date.now()}_${file.name}`;
-
-            const { data, error } = await _client.storage
-                .from('photos')
-                .upload(fileName, file);
-
-            if (error) {
-                alert('업로드 실패: ' + error.message);
-            } else {
-                alert('업로드 성공!');
-                loadPhotos();
-            }
-        }
-
-        async function loadPhotos() {
-            const { data, error } = await _client.storage.from('photos').list('', {
-                limit: 20,
-                sortBy: { column: 'created_at', order: 'desc' }
-            });
-
-            if (error) {
-                document.getElementById('fileList').innerHTML = "목록을 불러오지 못했습니다.";
-                return;
-            }
-
-            const listDiv = document.getElementById('fileList');
-            listDiv.innerHTML = '';
-            
-            data.forEach(file => {
-                const { data: { publicUrl } } = _client.storage.from('photos').getPublicUrl(file.name);
-                listDiv.innerHTML += `
-                    <div class="img-item">
-                        <img src="${publicUrl}">
-                        <a href="${publicUrl}" target="_blank" class="download-btn">내려받기</a>
-                    </div>`;
-            });
-        }
-
-        // 페이지 로드 시 실행
-        window.onload = loadPhotos;
-    </script>
-</body>
-</html>
+    window.onload = loadPhotos;
+</script>
